@@ -20,23 +20,30 @@ int main()
   key_t key;
   key = ftok(KEY, 'A');
   // Call the RSHMGET API
+  printf("Calling rshmget\n");
   rshmid = rshmget(key, 1024);
   printf("RSHMID: %d\n", rshmid);
 
   // Call the RSHMAT API
+  printf("Calling rshmat\n");
   addr = rshmat(rshmid, NULL);
+  printf("Attached\n");
   // Write something in shared memory
-  // strcpy(addr, "Hello");
+  printf("Writing data into rshm\n");
   *addr = 6;
   // Alert the server
+  printf("Calling rshmchanged\n");
   rshmChanged(rshmid);
   // Call the RSHMDT API
+  printf("Calling rshmdt\n");
   rshmdt(rshmid, addr);
 
   // Call the RSHMCTL API
+  printf("Destroying rshm using rshmCtl\n");
   rshmCtl(rshmid, IPC_RMID);
 
   // Call the RSHMGET API again
+  printf("Creating new rshm again using rshmget\n");
   rshmid = rshmget(key, 1024);
   printf("RSHMID: %d\n", rshmid);
   return 0;

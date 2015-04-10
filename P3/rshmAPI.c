@@ -197,7 +197,6 @@ void * rshmat(int rshmid, void *addr)
   address = shmat(replyMsg.shmid, addr, 0);
   if(address == (void *) -1)
     perror("Attachment error");
-  printf("%p\n", address);
   return address;
 }
 
@@ -208,7 +207,6 @@ int rshmdt(int rshmid, void *addr)
   sendMessage(myMsg);
   writeToFifo();
   replyMsg = receiveMessage();
-  printf("Response: %d\n", replyMsg.resp);
   // Detach shared memory
   shmdt(addr);
   // Reply with the response?
@@ -225,7 +223,6 @@ int rshmCtl(int rshmid, int cmd)
     sendMessage(myMsg);
     writeToFifo();
     replyMsg = receiveMessage();
-    printf("Response: %d\n", replyMsg.resp);
     return replyMsg.resp;
   }
   else

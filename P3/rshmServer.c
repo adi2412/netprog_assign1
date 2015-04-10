@@ -136,7 +136,6 @@ int updateStateTables(struct rshminfo *rshmTable, int sockfd)
     printf("Received table\n");
   }
   // The last response received would be a 0 from shutdown
-  printf("%d\n",i);
   return i;
 }
 
@@ -453,7 +452,6 @@ void sendMsgToRemoteServers(msg incomingMsg, int *sockets, int length, int rshmi
     else
     {
       // Send message to others about new memory
-      printf("Sending msg %ld", incomingMsg.mtype);
       sendMsg.type = 1;
       sendMsg.rshmid = rshmid;
       sendMsg.key = incomingMsg.key;
@@ -505,7 +503,6 @@ int handleRemoteMessage(struct remoteMsg tcpMsg, struct rshminfo *rshmTable)
     // New memory segment
     // Create shared memory
     int shmid;
-    printf("Received msg type 1\n");
     shmid = createSharedMem(tcpMsg.key, tcpMsg.size);
     addNewRSHM(tcpMsg.rshmid, tcpMsg.key, shmid, rshmTable);
   }
@@ -513,7 +510,6 @@ int handleRemoteMessage(struct remoteMsg tcpMsg, struct rshminfo *rshmTable)
   {
     // rshmat call
     // Increase refcount
-    printf("Received msg type 2\n");
     struct rshminfo *rshmRecord = NULL;
     rshmRecord = getInfoByRshm(tcpMsg.rshmid, rshmTable);
     if(rshmRecord)
@@ -576,7 +572,7 @@ int handleRemoteMessage(struct remoteMsg tcpMsg, struct rshminfo *rshmTable)
     {
       int data;
       data = tcpMsg.data;
-      printf("data received: %d\n", data);
+      printf("Data received: %d\n", data);
     }
   }
   return 0;
@@ -712,7 +708,6 @@ int main(int argc, char *argv[])
     if(FD_ISSET(fifo, &rset) && ncnt)
     {
       // There are messages in the message queue
-      printf("Fifo!\n");
       // Clear the fifo
       char a;
       int num;
@@ -720,6 +715,7 @@ int main(int argc, char *argv[])
       if(num > 0)
       {
         msg outMsg;
+        printf("Data on message queue\n");
         incomingMsg = receiveMessage(qid);
         outMsg = handleMessage(incomingMsg, rshmInfo);
         outMsg.mtype = 6;
