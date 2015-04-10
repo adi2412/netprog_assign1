@@ -5,8 +5,8 @@ DEPS_SHELL_PROG=shell.o
 
 all: prod_shell
 
-shell: $(DEPS_SERV_PROG)
-	$(CC) $(DEPS_SERV_PROG) -o shell
+shell: $(DEPS_SHELL_PROG)
+	$(CC) $(DEPS_SHELL_PROG) -o shell
 
 clean:
 	rm -rf *.out shell *.o *.dSYM

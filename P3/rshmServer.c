@@ -59,7 +59,7 @@ struct remoteMsg{
   int rshmid;
   key_t key;
   size_t size;
-  char *data;
+  int data;
   struct sockaddr_in myAddr;
 };
 
@@ -226,6 +226,7 @@ struct rshminfo * getInfoByRshm(int rshmid, struct rshminfo *rshmTable)
     }
     i++;
   }
+  printf("No such record %d\n", i);
   return NULL;
 }
 
@@ -270,6 +271,13 @@ int addNewRSHM(int rshmid, key_t key, int shmid, struct rshminfo *rshmTable)
   rshmTable[i].ref_count = 0;
   rshmTable[i].remote_addrs = calloc(MAXCONN,sizeof(struct sockaddr_in));
   printf("Updated entry %d with %d\n", i, rshmid);
+  // When you add, make sure you attach to the shared memory
+  void *address;
+  address = shmat(shmid, 0, 0);
+  if(address == (void *) -1)
+    perror("Attachment error");
+  rshmTable[i].addr = address;
+  printf("Attached to %p", address);
   return 0;
 }
 
@@ -362,6 +370,7 @@ msg handleMessage(msg incomingMsg, struct rshminfo *rshmTable)
     int rshmid, shmid;
     if((rshmid = shmByKeyExists(incomingMsg.key, rshmTable)))
     {
+      incomingMsg.rshmid = rshmid;
       incomingMsg.resp = rshmid;
       return incomingMsg;
     }
@@ -373,6 +382,7 @@ msg handleMessage(msg incomingMsg, struct rshminfo *rshmTable)
       // Add new entry to state table
       // I should do this below but then I don't have shmid later
       addNewRSHM(rshmid, incomingMsg.key, shmid, rshmTable);
+      incomingMsg.rshmid = rshmid;
       incomingMsg.resp = rshmid;
       return incomingMsg;
     }
@@ -436,18 +446,19 @@ void sendMsgToRemoteServers(msg incomingMsg, int *sockets, int length, int rshmi
   {
     // rshmget call
     int rid;
-    if((rid = shmByRshmidExists(rshmid, rshmTable)))
+    if((rid = shmByRshmidExists(rshmid, rshmTable)) == 0)
     {
       return;
     }
     else
     {
       // Send message to others about new memory
+      printf("Sending msg %ld", incomingMsg.mtype);
       sendMsg.type = 1;
       sendMsg.rshmid = rshmid;
       sendMsg.key = incomingMsg.key;
       sendMsg.size = incomingMsg.size;
-      sendMsg.data = NULL;
+      sendMsg.data = 0;
     }
   }
   else if(incomingMsg.mtype == 2)
@@ -456,7 +467,7 @@ void sendMsgToRemoteServers(msg incomingMsg, int *sockets, int length, int rshmi
     // Send message to increase ref count
     sendMsg.type = 2;
     sendMsg.rshmid = rshmid;
-    sendMsg.data = NULL;
+    sendMsg.data = 0;
   }
   else if(incomingMsg.mtype == 3)
   {
@@ -464,14 +475,14 @@ void sendMsgToRemoteServers(msg incomingMsg, int *sockets, int length, int rshmi
     // Send message to decrease ref count
     sendMsg.type = 3;
     sendMsg.rshmid = rshmid;
-    sendMsg.data = NULL;
+    sendMsg.data = 0;
   }
   else if(incomingMsg.mtype == 4)
   {
     // rshmctl call
     sendMsg.type = 4;
     sendMsg.rshmid = rshmid;
-    sendMsg.data = NULL;
+    sendMsg.data = 0;
   }
   else if(incomingMsg.mtype == 5)
   {
@@ -479,8 +490,9 @@ void sendMsgToRemoteServers(msg incomingMsg, int *sockets, int length, int rshmi
     sendMsg.type = 5;
     sendMsg.rshmid = rshmid;
     void *addr = getAddrByRshm(rshmid, rshmTable);
-    sendMsg.data = malloc(1024*sizeof(char));
-    strncpy(sendMsg.data, (char *)addr, 1024);
+    // sendMsg.data = malloc(1024*sizeof(char));
+    int data = *(int *)addr;
+    sendMsg.data = data;
   }
   sendMsg.myAddr = echoServAddr;
   sendRemoteMessage(sendMsg, sockets, length);
@@ -493,6 +505,7 @@ int handleRemoteMessage(struct remoteMsg tcpMsg, struct rshminfo *rshmTable)
     // New memory segment
     // Create shared memory
     int shmid;
+    printf("Received msg type 1\n");
     shmid = createSharedMem(tcpMsg.key, tcpMsg.size);
     addNewRSHM(tcpMsg.rshmid, tcpMsg.key, shmid, rshmTable);
   }
@@ -500,11 +513,19 @@ int handleRemoteMessage(struct remoteMsg tcpMsg, struct rshminfo *rshmTable)
   {
     // rshmat call
     // Increase refcount
+    printf("Received msg type 2\n");
     struct rshminfo *rshmRecord = NULL;
     rshmRecord = getInfoByRshm(tcpMsg.rshmid, rshmTable);
-    rshmRecord->ref_count++;
-    // TODO: Remote addrs?
-    rshmRecord->remote_addrs[rshmRecord->ref_count - 1] = tcpMsg.myAddr;
+    if(rshmRecord)
+    {
+      rshmRecord->ref_count++;
+      // TODO: Remote addrs?
+      rshmRecord->remote_addrs[rshmRecord->ref_count - 1] = tcpMsg.myAddr;
+    }
+    else
+    {
+      printf("No such shm");
+    }
   }
   else if(tcpMsg.type == 3)
   {
@@ -545,7 +566,18 @@ int handleRemoteMessage(struct remoteMsg tcpMsg, struct rshminfo *rshmTable)
     // Update shared memory with data
     struct rshminfo *rshmRecord = NULL;
     rshmRecord = getInfoByRshm(tcpMsg.rshmid, rshmTable);
-    strcpy(rshmRecord->addr, tcpMsg.data);
+    if(rshmRecord->addr == NULL)
+    {
+      // No client from my side has attached yet
+      // TCP attaches to the shared memory
+      printf("Address is null. can't add data\n"); 
+    }
+    else
+    {
+      int data;
+      data = tcpMsg.data;
+      printf("data received: %d\n", data);
+    }
   }
   return 0;
 }
@@ -638,7 +670,7 @@ int main(int argc, char *argv[])
 
   // Create the fifo
   mkfifo(FIFO, 0666);
-  fifo = open(FIFO, O_RDONLY | O_NONBLOCK);
+  fifo = open(FIFO, O_RDWR | O_NONBLOCK);
 
   // Find maxfd
   maxfd = maximumFd(sockets, numConns, fifo, servSock);
@@ -693,7 +725,7 @@ int main(int argc, char *argv[])
         outMsg.mtype = 6;
         sendMessage(outMsg, qid);
         // send messages to other servers
-        sendMsgToRemoteServers(incomingMsg, sockets, numConns, incomingMsg.rshmid, rshmInfo);
+        sendMsgToRemoteServers(incomingMsg, sockets, numConns, outMsg.rshmid, rshmInfo);
       }
       ncnt--;
     }

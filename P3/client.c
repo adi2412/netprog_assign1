@@ -26,7 +26,8 @@ int main()
   // Call the RSHMAT API
   addr = rshmat(rshmid, NULL);
   // Write something in shared memory
-  strcpy(addr, "Hello");
+  // strcpy(addr, "Hello");
+  *addr = 6;
   // Alert the server
   rshmChanged(rshmid);
   // Call the RSHMDT API

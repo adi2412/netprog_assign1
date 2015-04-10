@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-c
 DEBUG=-g
 DEPS_SERV_PROG=rshmServer.o
-DEPS_CLIENT_PROG=client.o rshmApi.o
+DEPS_CLIENT_PROG=client.o rshmAPI.o
 
 all: prod_rshmServer prod_client rshmServer client
 
@@ -21,8 +21,8 @@ rshmServer.o:rshmServer.c
 client.o:client.c
 	$(CC) $(CFLAGS) client.c
 
-rshmApi.o:rshmApi.c
-	$(CC) $(CFLAGS) rshmApi.c
+rshmAPI.o:rshmAPI.c
+	$(CC) $(CFLAGS) rshmAPI.c
 
 debug: rshmServer_debug client_debug
 
@@ -30,7 +30,7 @@ rshmServer_debug:
 	$(CC) $(DEBUG) rshmServer.c -o rshmServer
 
 client_debug:
-	$(CC) $(DEBUG) client.c rshmApi.c -o client
+	$(CC) $(DEBUG) client.c rshmAPI.c -o client
 
 prod_rshmServer:
 	cp rshmServer.c tempserv.c
